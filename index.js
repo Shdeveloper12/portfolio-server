@@ -1,18 +1,21 @@
 const express = require("express");
 const cors = require("cors");
-const app = express();
-const port = process.env.port || 3000;
-require("dotenv").config();
+const dotenv = require("dotenv");
+const nodemailer = require("nodemailer");
+const { MongoClient, ServerApiVersion } = require("mongodb");
 
-// middleware
+dotenv.config();
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
-const uri =
-  `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.dgti16b.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+// MongoDB URI
+const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.dgti16b.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+// MongoDB client
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -27,33 +30,63 @@ async function run() {
 
     const collection = client.db("portfolio").collection("contact");
 
-
-
-    // Create a document to insert
+    // POST /contact
     app.post("/contact", async (req, res) => {
-      const newPost = req.body;
-      const result = await collection.insertOne(newPost);
-      
+      const { name, email, subject, message } = req.body;
 
-      res.json(result);
+      // Save to MongoDB
+      const result = await collection.insertOne({
+        name,
+        email,
+        subject,
+        message,
+        date: new Date().toISOString(),
+      });
+
+      // Nodemailer setup
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.MAIL_USER,
+          pass: process.env.MAIL_PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: `"Portfolio Contact" <${process.env.MAIL_USER}>`,
+        to: process.env.MAIL_TO || process.env.MAIL_USER,
+        subject: `New Message from ${name}`,
+        html: `
+          <h2>New Contact Message</h2>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Subject:</strong> ${subject}</p>
+          <p><strong>Message:</strong><br/>${message}</p>
+        `,
+      };
+
+      try {
+        await transporter.sendMail(mailOptions);
+        res.json({ acknowledged: result.acknowledged, insertedId: result.insertedId });
+      } catch (emailErr) {
+        console.error("Email send error:", emailErr);
+        res.status(500).json({ error: "Message stored, but email failed to send." });
+      }
     });
 
-    // Send a ping to confirm a successful connection
+    app.get("/", (req, res) => {
+      res.send("📨 Portfolio Server Running with Email Support");
+    });
+
+    // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
-  } finally {
-    
-    // await client.close();
-  }
+    console.log(" Connected to MongoDB!");
+  } 
 }
+
 run().catch(console.dir);
 
-app.get("/", (req, res) => {
-  res.send("Portfolio Running");
-});
-
+// Start Express server
 app.listen(port, () => {
-  console.log(`Portfolio server is running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });

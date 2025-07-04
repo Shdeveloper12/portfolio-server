@@ -31,8 +31,8 @@ async function run() {
 
     // Create a document to insert
     app.post("/contact", async (req, res) => {
-      const data = req.body;
-      const result = await collection.insertOne(data);
+      const newPost = req.body;
+      const result = await collection.insertOne(newPost);
       
 
       res.json(result);

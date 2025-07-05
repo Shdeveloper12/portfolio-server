@@ -32,7 +32,7 @@ async function run() {
 
     // POST /contact
     app.post("/contact", async (req, res) => {
-      const { name, email, subject, message } = req.body;
+      const { name, email, subject, message, date } = req.body;
 
       // Save to MongoDB
       const result = await collection.insertOne({
@@ -58,6 +58,7 @@ async function run() {
         subject: `New Message from ${name}`,
         html: `
           <h2>New Contact Message</h2>
+          <p><strong>Name:</strong> ${date}</p>
           <p><strong>Name:</strong> ${name}</p>
           <p><strong>Email:</strong> ${email}</p>
           <p><strong>Subject:</strong> ${subject}</p>
@@ -75,13 +76,15 @@ async function run() {
     });
 
     app.get("/", (req, res) => {
-      res.send("📨 Portfolio Server Running with Email Support");
+      res.send("Portfolio Server Running with Email Support");
     });
 
     // Ping MongoDB to confirm connection
     await client.db("admin").command({ ping: 1 });
-    console.log(" Connected to MongoDB!");
-  } 
+    console.log("Connected to MongoDB!");
+  } catch (err) {
+    console.error("MongoDB connection error:", err);
+  }
 }
 
 run().catch(console.dir);
